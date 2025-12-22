@@ -22,8 +22,6 @@ class Level:
         self.create_border()
         self.generate_valid_level(tries=200)  # <-- варіант B
 
-    # ---------- БАЗОВІ РЕЧІ ----------
-
     def create_border(self):
         for x in range(COLS):
             self.grid[0][x] = 2
@@ -35,8 +33,6 @@ class Level:
     def reset_grid_keep_border(self):
         self.grid = [[0 for _ in range(COLS)] for _ in range(ROWS)]
         self.create_border()
-
-    # ---------- ТВОЯ ГЕНЕРАЦІЯ (майже без змін) ----------
 
     def generate_random_level(self):
         # 1) Генерація перешкод (ліва половина)
@@ -91,11 +87,9 @@ class Level:
             if x + i < COLS - 1:
                 self.grid[y][x + i] = type_id
 
-    # ---------- ВАРІАНТ B: BFS + ВАЛІДАЦІЯ + РЕГЕНЕРАЦІЯ ----------
-
+    # Валідація рівню
     def _is_walkable(self, x, y) -> bool:
         return self.grid[y][x] in (0, 4)
-
 
     def bfs_from(self, sx, sy) -> set:
         if not (0 <= sx < COLS and 0 <= sy < ROWS):
@@ -146,7 +140,6 @@ class Level:
         print("⚠️ Warning: could not generate a valid level, using last attempt.")
 
     # Фізичні взаємодії з блоками
-
     def can_move(self, nx, ny):
         if nx < 0 or nx >= COLS or ny < 0 or ny >= ROWS:
             return False
@@ -185,33 +178,49 @@ class Level:
                 return True
         return False
 
-    def load_from_file(self,path):
+    def load_from_file(self, filename):
         self.reset_grid_keep_border()
+        enemies = []
 
-        with open(path, 'r') as f:
-            lines = f.readlines()
+        with open(filename, 'r') as f:
+            lines = [line.strip() for line in f.readlines() if line.strip()]
 
-        for y in range(min(ROWS, len(lines))):
-            line = lines[y].strip()
-            for x in range(min(COLS, len(line))):
-                char = line[x]
+        enemy_char_map = {
+            'b': 'BASIC',
+            'f': 'FAST',
+            'a': 'ARMOR',
+            's': 'SNIPER'
+        }
+
+        # Проходимо по рядках
+        map_row = 0
+        for line in lines:
+
+            if line.startswith("ENEMIES:"):
+                code_string = line.split(":")[1].strip()
+                for char in code_string:
+                    if char in enemy_char_map:
+                        enemies.append(enemy_char_map[char])
+                continue # Переходимо до наступного рядка, не малюємо це на карті
+
+            if map_row < ROWS:
+                for x in range(min(COLS, len(line))):
+                    char = line[x]
+                    if char == '#': self.grid[map_row][x] = 1
+                    elif char == '@': self.grid[map_row][x] = 2
+                    elif char == '~': self.grid[map_row][x] = 3
+                    elif char == '%': self.grid[map_row][x] = 4
+                    else: self.grid[map_row][x] = 0
                 
-                # Мапинг символів 
-                if char == '#':
-                    self.grid[y][x] = 1
-                elif char == '@':
-                    self.grid[y][x] = 2
-                elif char == '~':
-                    self.grid[y][x] = 3
-                elif char == '%':
-                    self.grid[y][x] = 4
-                else:
-                    self.grid[y][x] = 0
-        
-        for sx, sy in self.enemy_spawn_points:
-             self.grid[sy][sx] = 0
+                map_row += 1
+
+        for spawn_x, spawn_y in self.enemy_spawn_points:
+             self.grid[spawn_y][spawn_x] = 0
              
-        return True
+        if not enemies:
+            enemies = ["BASIC"] * 20 
+
+        return enemies
 
     def draw(self, screen):
         for row in range(ROWS):

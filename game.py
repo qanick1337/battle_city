@@ -4,7 +4,7 @@ import random
 import pygame
 import assets
 
-from enemy import Enemy
+from enemies.enemy import Enemy
 from settings import (
     WIDTH, HEIGHT, BG_COLOR, FPS, ROWS, COLS, HUD_WIDTH,
     HUD_TEXT_COLOR, TILE, HUD_BG_COLOR
@@ -13,6 +13,7 @@ from level_builder import Level
 from player import Player
 from bullet import Bullet
 from explosion import Explosion
+from bonus import Bonus
 
 
 class Game:
@@ -64,17 +65,13 @@ class Game:
         self.enemies = []
         self.bullets = []
         self.explosions = []
+        self.bonuses = []
 
 
     def reset(self):
-        # --- Ініціалізація світу ---
+        # Створення сутностей для геймплею
         self.player = Player((self.player.spawn))
 
-        self.enemies = [
-            Enemy(COLS // 2, 1),
-            Enemy(COLS - 3, 1),
-            Enemy(2, 1)
-        ]
 
         self.bullets = []
         self.player_bullet = None
@@ -163,15 +160,24 @@ class Game:
     def start_game(self):
         self.apply_difficulty_settings()
 
+        self.level_enemy_queue = []
+
         if self.game_mode == "ARCADE":
             self.level.generate_valid_level()
+
+            for num in range(self.MAX_ENEMIES_PER_LEVEL):
+                t = random.choice(["BASIC", "FAST", "ARMOR", "SNIPER"])
+                self.level_enemy_queue.append(t)
+                
         else:
             path = f"levels/level_{self.campaign_level_num}.txt"
             if not os.path.exists(path):
                 print(f"Рівень {path} не знайдено! Генеруємо випадковий.")
                 self.level.generate_valid_level()
+                self.level_enemy_queue = ["BASIC"] * self.MAX_ENEMIES_PER_LEVEL
             else:
-                self.level.load_from_file(path) 
+                self.level_enemy_queue = self.level.load_from_file(path) 
+            self.MAX_ENEMIES_PER_LEVEL = len(self.level_enemy_queue)
 
         self.reset_entities()
         self.state = "PLAY"
@@ -186,26 +192,20 @@ class Game:
         self.initial_player_hp = settings["player_hp"]
 
     def reset_entities(self):
-        # Створюємо гравця з HP відповідно до складності
         self.player = Player(2, ROWS - 3)
         self.player.hp = self.initial_player_hp 
 
         self.enemies = []
-        # Початкові вороги
-        initial_spawns = [(COLS // 2, 1), (COLS - 3, 1), (2, 1)]
-        for x, y in initial_spawns:
-             self.enemies.append(Enemy(x, y))
-
         self.bullets = []
         self.player_bullet = None
         self.explosions = []
+        self.bonuses = []
 
         self.enemy_counter = 0
         self.spawned_enemies = len(self.enemies)
-        self.enemy_spawn_timer = self.ENEMY_SPAWN_INTERVAL
+        self.enemy_spawn_timer = 0
         self.damage_flash_timer = 0
         self.DAMAGE_FLASH_DURATION = FPS / 4
-
 
     def handle_play_events(self):
         for event in pygame.event.get():
@@ -228,7 +228,7 @@ class Game:
     def update_play(self):
         # вороги
         for enemy in self.enemies:
-            enemy.update(self.level, self.bullets)
+            enemy.update(self.level, self.bullets, self.player)
 
         # спавн ворогів
         self.update_enemy_spawning()
@@ -249,20 +249,29 @@ class Game:
         self.player.update()
         self.player.handle_input(keys, self.level)
 
+        for bonus in self.bonuses:
+            if self.player.x == bonus.x and self.player.y == bonus.y:
+                self.apply_bonus(bonus.type, self.player)
+                self.bonuses.remove(bonus)
+
         # game over
         if self.player.hp <= 0:
             self.draw_game_over()
         
         # win
         if self.enemy_counter >= self.MAX_ENEMIES_PER_LEVEL:
-            self.handle_level_completion() 
+            self.handle_level_completion()  
 
     def update_enemy_spawning(self):
         self.enemy_spawn_timer -= 1
 
-        if (self.enemy_spawn_timer <= 0
-            and len(self.enemies) < self.MAX_ENEMIES_ON_SCREEN
-            and self.spawned_enemies < self.MAX_ENEMIES_PER_LEVEL):
+        # Умови спавну:
+        # На екрані є місце (< MAX_ON_SCREEN)
+        # У черзі ще є вороги (self.level_enemy_queue не пуста)
+        
+        if (self.enemy_spawn_timer <= 0 
+            and len(self.enemies) < self.MAX_ENEMIES_ON_SCREEN 
+            and len(self.level_enemy_queue) > 0):
 
             spawn_points = self.level.enemy_spawn_points[:]
             random.shuffle(spawn_points)
@@ -270,8 +279,11 @@ class Game:
             for spawn_x, spawn_y in spawn_points:
                 if not self.level.can_move(spawn_x, spawn_y):
                     continue
-
-                self.enemies.append(Enemy(spawn_x, spawn_y))
+                
+                # --- БЕРЕМО НАСТУПНОГО ВОРОГА З ЧЕРГИ ---
+                next_enemy_type = self.level_enemy_queue.pop(0) # Забираємо першого
+                
+                self.enemies.append(Enemy(spawn_x, spawn_y, next_enemy_type))
                 self.spawned_enemies += 1
                 break
 
@@ -304,13 +316,27 @@ class Game:
 
                 if bullet_x == enemy_cell_x and bullet_y == enemy_cell_y:
                     bullet.active = False
-                    enemy.alive = False
-                    self.enemy_counter += 1
-                    self.explosions.append(Explosion(enemy_cell_x, enemy_cell_y))
                     hit = True
+
+                    is_dead = enemy.take_damage()
+                    
+                    if is_dead:
+                        self.enemy_counter += 1
+                        self.explosions.append(Explosion(enemy_cell_x, enemy_cell_y))
+
+                        if enemy.type == "FAST":
+                            if random.random() < 0.5:
+                                self.bonuses.append(Bonus(bullet_x, bullet_y, "FREEZE"))
+
+                        if enemy.type == "SNIPER":
+                            if random.random() < 0.5:
+                                self.bonuses.append(Bonus(bullet_x, bullet_y, "GRENADE"))
+                        if enemy.type == "ARMOR":
+                            if random.random() < 0.5:
+                                self.bonuses.append(Bonus(bullet_x, bullet_y, "HEART"))
                     break
 
-            if not hit:
+            if enemy.alive:
                 new_enemies.append(enemy)
 
         self.enemies = new_enemies
@@ -322,7 +348,7 @@ class Game:
             self.draw_win_message("Ви перемогли!")
 
         if self.game_mode == "ARCADE":
-            self.state = "MENU"
+            self.start_game()
         
         elif self.game_mode == "CAMPAIGN":
             self.campaign_level_num += 1
@@ -334,6 +360,24 @@ class Game:
             else:
                 self.draw_win_message("Кампанія ПРОЙДЕНА!")
                 self.state = "MENU"
+    
+    def apply_bonus(self, bonus_type, player):
+        if bonus_type == "GRENADE":
+            for enemy in self.enemies:
+                enemy.alive = False 
+                self.explosions.append(Explosion(enemy.x, enemy.y))
+            self.enemy_counter += len(self.enemies)
+            self.enemies = []
+
+        elif bonus_type == "SHIELD":
+            player.invincible += FPS*10
+        elif bonus_type == "HEART":
+            player.hp +=1
+        elif bonus_type == "FREEZE":
+            for enemy in self.enemies:
+                enemy.move_timer += FPS*2
+                enemy.shoot_timer += FPS*2
+
     # Методи малювання
 
     def draw_play(self):
@@ -350,6 +394,9 @@ class Game:
 
         for explosion in self.explosions:
             explosion.draw(self.screen)
+        
+        for bonus in self.bonuses:
+            bonus.draw(self.screen)
 
         # трава поверх усього
         self.level.draw_grass(self.screen)

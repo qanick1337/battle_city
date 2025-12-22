@@ -76,9 +76,11 @@ class Player:
 
         if img is None:
             return
-
-        # Мерехтіння при влучанні (як у тебе)
+        
         if self.invincible > 0:
-            return
+            сenter = (self.x * TILE + TILE // 2, self.y * TILE + TILE // 2)
+            radius = TILE // 2 + 2
+             # Малюємо тонке синє коло
+            pygame.draw.circle(screen, (100, 100, 255), сenter, radius, width=2)
 
         screen.blit(img, (self.x * TILE, self.y * TILE))

@@ -2,7 +2,7 @@
 import os
 import pygame
 from settings import TILE
-# Paths are built relative to this file so the game can be started from any working directory.
+
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 player_up = None
@@ -24,6 +24,9 @@ bullet = None
 bullet_hor = None
 explossion = None
 
+bonus_images = None
+
+
 def load_image(filename, size):
     path = os.path.join(ASSETS_DIR, filename)
     image = pygame.image.load(path)
@@ -33,7 +36,7 @@ def load_image(filename, size):
 
 
 def load_assets():
-    global player_up, player_down, player_left, player_right, enemy_up, enemy_down, enemy_left, enemy_right, brick, steel, water, bullet, bullet_hor, grass, explossion
+    global player_up, player_down, player_left, player_right, enemy_up, enemy_down, enemy_left, enemy_right, brick, steel, water, bullet, bullet_hor, grass, explossion, bonus_images
 
     player_up = load_image("tank_top.png", TILE)
     player_down = load_image("tank_bottom.png", TILE)
@@ -53,3 +56,10 @@ def load_assets():
     bullet = load_image("bullet.png",TILE)
     bullet_hor = load_image("bullet _hor.png", TILE)
     explossion = load_image("explossion_tank.png", TILE)
+
+    bonus_images = {
+        "GRENADE": load_image("grenade.png", TILE),
+        "SHIELD": load_image("shield.png", TILE),
+        "HEART": load_image("heart.png", TILE),
+        "FREEZE": load_image("freeze.png", TILE)
+    }
