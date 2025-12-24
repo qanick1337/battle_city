@@ -169,7 +169,7 @@ class Enemy:
         if level.can_move(new_x, new_y):
             self.x = new_x
             self.y = new_y
-            if random.random() < 0.5:
+            if random.random() < 0.05:
                  self.change_direction_smart(level, player)
         else:
             # якщо врізався → змінюємо напрямок
@@ -237,6 +237,11 @@ class Enemy:
         
         player_x, player_y = player.get_grid_pos()
 
+        dist_x = abs(player_x - self.x)
+        dist_y = abs(player_y - self.y)
+
+        is_tracking_active = dist_y > 3 and dist_x >3
+
         for direction, dx, dy, weight in directions:
             nx, ny = self.x + dx, self.y + dy
             
@@ -244,14 +249,15 @@ class Enemy:
                 continue
             
             # 2. Модифікатор: Якщо це напрямок до гравця - збільшуємо вагу
-            if direction == "DOWN" and player_y > self.y: 
-                weight += 30
-            if direction == "UP" and player_y < self.y: 
-                weight += 20
-            if direction == "LEFT" and player_x < self.x: 
-                weight += 30
-            if direction == "RIGHT" and player_x > self.x: 
-                weight += 30
+            if is_tracking_active:
+                if direction == "DOWN" and player_y > self.y: 
+                    weight += 30
+                if direction == "UP" and player_y < self.y: 
+                    weight += 20
+                if direction == "LEFT" and player_x < self.x: 
+                    weight += 30
+                if direction == "RIGHT" and player_x > self.x: 
+                    weight += 30
             
             # Додаємо цей напрямок у список стільки разів, яка його вага
             options.append(direction)

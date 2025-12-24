@@ -1,7 +1,7 @@
 # settings.py
 TILE = 40
-COLS = 16
-ROWS = 16
+COLS = 17
+ROWS = 17
 HUD_WIDTH = 250
 
 WIDTH = COLS * TILE + HUD_WIDTH

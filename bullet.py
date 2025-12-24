@@ -42,13 +42,32 @@ class Bullet:
                 did_damage = player.take_damage()
                 self.active = False
                 return did_damage
+    
+    def check_base_collision(self, base):
+        if not self.active:
+            return False
+            
+        # Тільки ворожі кулі можуть знищити базу
+        if not self.is_enemy:
+            return False
+            
+        # Перевірка координат 
+        bullet_x = int(self.x)
+        bullet_y = int(self.y)
+        
+        if bullet_x == base.x and bullet_y == base.y:
+            base.destroy()
+            self.active = False
+            return True
+            
+        return False
 
     def draw(self, screen):
         if not self.active:
             return
-        # cx = int(self.x * TILE + TILE / 2)
-        # cy = int(self.y * TILE + TILE / 2)
-        # pygame.draw.circle(screen, BULLET_COLOR, (cx, cy), TILE // 6)
+        cx = int(self.x * TILE + TILE / 2)
+        cy = int(self.y * TILE + TILE / 2)
+        pygame.draw.circle(screen, BULLET_COLOR, (cx, cy), TILE // 6)
 
         if self.direction == "UP":
             img = assets.bullet

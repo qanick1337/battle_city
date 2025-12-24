@@ -5,14 +5,18 @@ import assets
 
 
 class Player:
-    def __init__(self, cell_x, cell_y):
-        # координати у КЛІТИНКАХ
+    def __init__(self, cell_x, cell_y, lives = 3):
+
+        self.start_pos = (cell_x, cell_y)
+
         self.x = cell_x
         self.y = cell_y
         self.direction = "UP"
 
         self.hp = 3
         self.invincible = 0
+
+        self.lives = lives
 
         self.size = TILE
         self.move_cooldown = 0  # затримка між рухами
@@ -34,9 +38,23 @@ class Player:
     def take_damage(self):
         if self.invincible > 0:
             return False
+        
         self.hp -= 1
-        self.invincible = 30  # ~0.5с при 60 FPS
-        return True
+
+        if self.hp <= 0:
+            self.lives -= 1
+            return True
+        
+        return False
+
+    def respawn(self):
+
+        self.x, self.y = self.start_pos
+        
+        self.direction = "UP"
+        self.hp = 1 
+
+        self.invincible = 180 # 3 секунди невразливості 
 
     def handle_input(self, keys, level):
         if self.move_cooldown > 0:

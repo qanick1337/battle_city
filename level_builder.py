@@ -1,4 +1,4 @@
-# level.py
+# level_builder.py
 import pygame
 import random
 from collections import deque

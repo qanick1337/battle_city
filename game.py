@@ -1,19 +1,23 @@
+# game.py
 import sys
 import os
 import random
 import pygame
 import assets
+import save_manager
 
 from enemies.enemy import Enemy
 from settings import (
     WIDTH, HEIGHT, BG_COLOR, FPS, ROWS, COLS, HUD_WIDTH,
     HUD_TEXT_COLOR, TILE, HUD_BG_COLOR
 )
+
 from level_builder import Level
 from player import Player
 from bullet import Bullet
 from explosion import Explosion
 from bonus import Bonus
+from base import Base
 
 
 class Game:
@@ -36,18 +40,27 @@ class Game:
         self.finish_font = pygame.font.SysFont("Consolas", 30)
         self.menu_font = pygame.font.SysFont("Consolas", 25)
 
+        self.stats_font = pygame.font.SysFont("Consolas", 15)
+
         # Рівні складності
         self.difficulty_presets = {
-            "EASY": {"player_hp":5, "max_enemies":5, "spawn_speed": FPS*4, "max_enemies_on_map":3},
-            "NORMAL": {"player_hp": 3, "max_enemies": 10, "spawn_speed": FPS * 3, "max_enemies_on_map":5},
-            "HARD":   {"player_hp": 1, "max_enemies": 20, "spawn_speed": FPS * 2, "max_enemies_on_map":10},
-            "HARDCORE":   {"player_hp": 1, "max_enemies": 30, "spawn_speed": FPS * 1, "max_enemies_on_map":20}
+            "EASY": {"player_hp":1, "lives": 5, "max_enemies":5, "spawn_speed": FPS*4, "max_enemies_on_map":3},
+            "NORMAL": {"player_hp": 1, "lives": 3, "max_enemies": 10, "spawn_speed": FPS * 3, "max_enemies_on_map":5},
+            "HARD":   {"player_hp": 1, "lives": 2, "max_enemies": 20, "spawn_speed": FPS * 2, "max_enemies_on_map":10},
+            "HARDCORE":   {"player_hp": 1, "lives": 1, "max_enemies": 30, "spawn_speed": FPS * 1, "max_enemies_on_map":20}
         }
+
+        self.game_data = save_manager.load_data()
 
         # Поточні вибори в меню
         self.selected_difficulty = "NORMAL"
-        self.game_mode = "ARCADE"
-        self.campaign_level_num = 1
+        self.game_mode = "CAMPAIGN"
+
+        self.update_level_num_from_save()
+        
+        # Встановлюємо рівень відповідно до збереження для NORMAL
+        self.campaign_level_num = self.game_data["campaign_progress"].get(self.selected_difficulty, 1)
+        self.default_level_num = self.game_data["classic_progress"].get(self.selected_difficulty, 1)
 
         # Стан гри: 'MENU', 'PLAY', 'GAME_OVER', 'WIN'
         self.state = "MENU"
@@ -61,12 +74,28 @@ class Game:
 
         # Створення ігрових об'єктів
         self.level = Level()
+        self.base = None
         self.player = None
         self.enemies = []
         self.bullets = []
         self.explosions = []
         self.bonuses = []
+        self.player_respawn_timer = 0
 
+    def get_progress_key(self):
+        if self.game_mode == "DEFAULT":
+            return f"DEFAULT_{self.selected_difficulty}"
+        else:
+            return self.selected_difficulty
+        
+    def update_level_num_from_save(self):
+        if self.game_mode == "DEFAULT":
+            dict_key = "classic_progress"
+            self.default_level_num = self.game_data[dict_key].get(self.selected_difficulty, 1)
+        else:
+            dict_key = "campaign_progress"
+            self.campaign_level_num = self.game_data[dict_key].get(self.selected_difficulty, 1) 
+        
 
     def reset(self):
         # Створення сутностей для геймплею
@@ -98,56 +127,87 @@ class Game:
                 self.update_play()
                 self.draw_play()
 
+            elif self.state == "PAUSE":
+                self.handle_pause_events()
+                self.draw_pause()
+
         pygame.quit()
         sys.exit()
 
     # Menu-events
     def handle_menu_events(self):
         for event in pygame.event.get():
+            if event.type == pygame.QUIT: self.running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_a: self.game_mode = "ARCADE"
+                elif event.key == pygame.K_c: self.game_mode = "CAMPAIGN"
+                elif event.key == pygame.K_d: self.game_mode = "DEFAULT"
+                
+                elif event.key == pygame.K_1: self.selected_difficulty = "EASY"
+                elif event.key == pygame.K_2: self.selected_difficulty = "NORMAL"
+                elif event.key == pygame.K_3: self.selected_difficulty = "HARD"
+                elif event.key == pygame.K_4: self.selected_difficulty = "HARDCORE"
+                
+                # Оновлюємо відображення рівня при зміні режиму чи складності
+                if event.key in (pygame.K_a, pygame.K_c, pygame.K_d, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4):
+                    self.update_level_num_from_save()
+
+                elif event.key == pygame.K_RETURN: self.start_game()
+                elif event.key == pygame.K_ESCAPE: self.running = False
+
+    def handle_pause_events(self):
+        for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-
+            
             if event.type == pygame.KEYDOWN:
-                # Вибір режиму за допомогою клавіш "A" та "C"
-                if event.key == pygame.K_a:
-                    self.game_mode = "ARCADE"
-                    self.start_game()
-                elif event.key == pygame.K_c:
-                    self.game_mode = "CAMPAIGN"
-                    self.campaign_level_num = 1 # Починаємо з першого
-                    self.start_game()
-                
-                # Вибір складності
-                elif event.key == pygame.K_1:
-                    self.selected_difficulty = "EASY"
-                elif event.key == pygame.K_2:
-                    self.selected_difficulty = "NORMAL"
-                elif event.key == pygame.K_3:
-                    self.selected_difficulty = "HARD"
-                elif event.key == pygame.K_4:
-                    self.selected_difficulty = "HARDCORE"
-                
-                elif event.key == pygame.K_ESCAPE:
-                    self.running = False     
+                self.state = "PLAY"
 
     def draw_menu(self):
-        self.screen.fill((20, 20, 20)) # Темний фон
+        self.screen.fill((20, 20, 20))
 
-        # Заголовок
         title = self.title_font.render("BATTLE CITY", True, (255, 215, 0))
-        self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 100))
+        self.screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 80))
+      
+        # 1. Режим гри
+        mode_text_str = f"Режим гри: < {self.game_mode} >"
+        if self.game_mode == "DEFAULT": m_color = (0, 255, 0)
+        elif self.game_mode == "CAMPAIGN": m_color = (255, 200, 0)
+        else: m_color = (0, 255, 255)
+        self.draw_text_centered(mode_text_str, 200, m_color)
+        self.draw_text_centered("(Натисніть A - Arcade, C - Campaign, D - Default", 230, (100, 100, 100))
 
-        # Вибір режиму
-        self.draw_text_centered("Натисніть [A] для ARCADE Mode (Випадковий рівень)", 200, (255, 255, 255))
-        self.draw_text_centered("Натисніть [C] для CAMPAIGN Mode (Проходження рівнів)", 240, (255, 255, 255))
 
-        # Складність
-        diff_text = f"Складність: < {self.selected_difficulty} >"
-        if self.selected_difficulty == "HARDCORE":
-            self.draw_text_centered(diff_text, 320, (255, 0, 0))
+        # 2. Складність
+        diff_text_str = f"Складність: < {self.selected_difficulty} >"
+        diff_color = (255, 0, 0) if self.selected_difficulty == "HARDCORE" else (0, 255, 0)
+        self.draw_text_centered(diff_text_str, 280, diff_color)
+        self.draw_text_centered("(Натисніть 1-Easy, 2-Normal, 3-Hard, 4-Hardcore)", 310, (100, 100, 100))
+
+        # 3. Кнопка Старт
+        blink_speed = pygame.time.get_ticks() // 500  # Блимання раз на пів секунди
+        if blink_speed % 2 == 0:
+            self.draw_text_centered("НАТИСНІТЬ [ENTER] ЩОБ ПОЧАТИ", 400, (255, 255, 255))
+       
+        # Якщо обрано Кампанію або Класику - показуємо прогрес
+        if self.game_mode == "DEFAULT":
+            # Показуємо default_level_num
+            lvl_info = f"Прогрес (Classic): Рівень {self.default_level_num}"
+            self.draw_text_centered(lvl_info, HEIGHT - 60, (0, 255, 0))
+            
+        elif self.game_mode == "CAMPAIGN":
+            # Показуємо campaign_level_num
+            lvl_info = f"Прогрес (Campaign): Рівень {self.campaign_level_num}"
+            self.draw_text_centered(lvl_info, HEIGHT - 60, (255, 215, 0))
+            
         else:
-            self.draw_text_centered(diff_text, 320, (0, 255, 0))
-        self.draw_text_centered("(Натисніть 1-Easy, 2-Normal, 3-Hard)", 350, (150, 150, 150))
+            self.draw_text_centered("Аркада: Безкінечна війна", HEIGHT - 60, (0, 255, 255))
+
+        # Загальна статистика
+        stats = self.game_data["stats"]
+        stat_text = f"Ігор: {stats['total_games']} | Вбито: {stats['total_kills']} | Смертей: {stats['deaths']}"
+        stat_surf = self.stats_font.render(stat_text, True, (80, 80, 80))
+        self.screen.blit(stat_surf, (10, HEIGHT - 20))
 
         pygame.display.flip()
 
@@ -158,25 +218,41 @@ class Game:
 
     # Game-events
     def start_game(self):
+        save_manager.add_stats(games=1)
+        self.game_data = save_manager.load_data()
         self.apply_difficulty_settings()
-
         self.level_enemy_queue = []
 
+        # 1. ARCADE
         if self.game_mode == "ARCADE":
             self.level.generate_valid_level()
-
             for num in range(self.MAX_ENEMIES_PER_LEVEL):
                 t = random.choice(["BASIC", "FAST", "ARMOR", "SNIPER"])
                 self.level_enemy_queue.append(t)
-                
+        
+        # 2. DEFAULT (Classic) - Використовуємо default_level_num
+        elif self.game_mode == "DEFAULT":
+            # Тут використовуємо self.default_level_num
+            path = f"classic_levels/level_{self.default_level_num}.txt"
+
+            if not os.path.exists(path):
+                print(f"Classic рівень {path} не знайдено! Генеруємо рандом.")
+                self.level.generate_valid_level()
+                self.level_enemy_queue = ["BASIC"] * self.MAX_ENEMIES_PER_LEVEL
+            else:
+                self.level_enemy_queue = self.level.load_from_file(path)
+            self.MAX_ENEMIES_PER_LEVEL = len(self.level_enemy_queue)
+
+        # 3. CAMPAIGN - Використовуємо campaign_level_num
         else:
             path = f"levels/level_{self.campaign_level_num}.txt"
             if not os.path.exists(path):
-                print(f"Рівень {path} не знайдено! Генеруємо випадковий.")
+                print(f"Рівень {path} не знайдено! Генеруємо рандом.")
                 self.level.generate_valid_level()
                 self.level_enemy_queue = ["BASIC"] * self.MAX_ENEMIES_PER_LEVEL
             else:
                 self.level_enemy_queue = self.level.load_from_file(path) 
+
             self.MAX_ENEMIES_PER_LEVEL = len(self.level_enemy_queue)
 
         self.reset_entities()
@@ -188,12 +264,32 @@ class Game:
         self.MAX_ENEMIES_ON_SCREEN = settings["max_enemies_on_map"]
         self.MAX_ENEMIES_PER_LEVEL = settings["max_enemies"]
         self.ENEMY_SPAWN_INTERVAL = settings["spawn_speed"]
-        
+
+        self.initial_player_lives = settings["lives"]
         self.initial_player_hp = settings["player_hp"]
+        
 
     def reset_entities(self):
-        self.player = Player(2, ROWS - 3)
+        if self.game_mode == "DEFAULT":
+            base_x = 8
+            base_y = ROWS - 2
+            self.base = Base(base_x, base_y)
+
+            spawn_x = base_x - 2 
+
+        else:   
+            self.base = None # Бази немає
+            spawn_x = COLS // 2 # Спавн по центру
+
+        spawn_y = ROWS - 2 # Завжди знизу
+
+        
+
+        self.player = Player(spawn_x, spawn_y, lives=self.initial_player_lives)
         self.player.hp = self.initial_player_hp 
+
+        if 0 <= spawn_y < ROWS and 0 <= spawn_x < COLS:
+            self.level.grid[spawn_y][spawn_x] = 0
 
         self.enemies = []
         self.bullets = []
@@ -209,14 +305,12 @@ class Game:
 
     def handle_play_events(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-
+            if event.type == pygame.QUIT: self.running = False
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    self.try_shoot_player()
-                elif event.key == pygame.K_ESCAPE:
-                    self.state = "MENU" # Пауза / Вихід в меню
+                if event.key == pygame.K_SPACE: 
+                    if self.player.hp > 0: self.try_shoot_player()
+                elif event.key == pygame.K_ESCAPE: self.state = "MENU"
+                elif event.key == pygame.K_p: self.state = "PAUSE"
 
     def try_shoot_player(self):
         if self.player_bullet is None or not self.player_bullet.active:
@@ -250,13 +344,27 @@ class Game:
         self.player.handle_input(keys, self.level)
 
         for bonus in self.bonuses:
+            bonus.timer -=1
+
+            if not bonus.timer:
+                self.bonuses.remove(bonus)
             if self.player.x == bonus.x and self.player.y == bonus.y:
                 self.apply_bonus(bonus.type, self.player)
                 self.bonuses.remove(bonus)
 
+            
+
         # game over
         if self.player.hp <= 0:
-            self.draw_game_over()
+
+            if self.player_respawn_timer > 0:
+                self.player_respawn_timer -= 1
+            else:
+                # Якщо залишилися життя, респавнемо гравця
+                if self.player.lives > 0:
+                    self.player.respawn() 
+                else:
+                    self.draw_game_over() 
         
         # win
         if self.enemy_counter >= self.MAX_ENEMIES_PER_LEVEL:
@@ -291,9 +399,16 @@ class Game:
 
     def update_bullets(self):
         for bullet in self.bullets:
-            did_damage = bullet.update(self.level, self.player)
-            if did_damage:
+            did_die = bullet.update(self.level, self.player)
+            
+            if did_die:
                 self.damage_flash_timer = self.DAMAGE_FLASH_DURATION
+
+            if self.game_mode == "DEFAULT" and self.base and self.base.alive:
+                if bullet.check_base_collision(self.base):
+                    self.explosions.append(Explosion(self.base.x, self.base.y))
+                    self.draw_game_over()
+                    return
 
         self.bullets = [b for b in self.bullets if b.active]
 
@@ -342,25 +457,54 @@ class Game:
         self.enemies = new_enemies
 
     def handle_level_completion(self):
-        if self.game_mode == "CAMPAIGN":
-            self.draw_win_message(f"Рівень {self.campaign_level_num} ПРОЙДЕНО")
-        else:
-            self.draw_win_message("Ви перемогли!")
-
-        if self.game_mode == "ARCADE":
-            self.start_game()
+        save_manager.add_stats(kills=self.enemy_counter)
         
-        elif self.game_mode == "CAMPAIGN":
-            self.campaign_level_num += 1
+        if self.game_mode == "DEFAULT":
+            self.draw_win_message(f"CLASSIC {self.default_level_num} ПРОЙДЕНО")
             
-            next_level_path = f"levels/level_{self.campaign_level_num}.txt"
+            next_level = self.default_level_num + 1
+            if self.default_level_num == 5:
+                self.draw_win_message("КЛАСИКУ ЗАВЕРШЕНО! НОВА ГРА+")
+                next_level = 1
             
-            if os.path.exists(next_level_path):
+            # Зберігаємо в classic_progress
+            save_manager.update_progress("DEFAULT", self.selected_difficulty, next_level)
+            self.game_data = save_manager.load_data()
+            
+            self.default_level_num = next_level
+            
+            path = f"classic_levels/level_{self.default_level_num}.txt"
+            if os.path.exists(path):
                 self.start_game()
             else:
-                self.draw_win_message("Кампанія ПРОЙДЕНА!")
+                self.draw_win_message("Рівень не знайдено!")
                 self.state = "MENU"
-    
+
+        elif self.game_mode == "CAMPAIGN":
+            self.draw_win_message(f"Рівень {self.campaign_level_num} ПРОЙДЕНО")
+            
+            next_level = self.campaign_level_num + 1
+            if self.campaign_level_num == 10:
+                self.draw_win_message("КАМПАНІЮ ЗАВЕРШЕНО!")
+                next_level = 1
+
+            # Зберігаємо в campaign_progress
+            save_manager.update_progress("CAMPAIGN", self.selected_difficulty, next_level)
+            self.game_data = save_manager.load_data()
+
+            self.campaign_level_num = next_level
+            
+            path = f"levels/level_{self.campaign_level_num}.txt"
+            if os.path.exists(path):
+                self.start_game()
+            else:
+                self.draw_win_message("Рівень не знайдено!")
+                self.state = "MENU"
+
+        else:
+            self.draw_win_message("Ви перемогли! Наступний раунд...")
+            self.start_game()
+  
     def apply_bonus(self, bonus_type, player):
         if bonus_type == "GRENADE":
             for enemy in self.enemies:
@@ -379,13 +523,16 @@ class Game:
                 enemy.shoot_timer += FPS*2
 
     # Методи малювання
-
-    def draw_play(self):
+    def draw_play(self, flip=True):
         self.screen.fill(BG_COLOR)
 
         self.level.draw(self.screen)
         self.player.draw(self.screen)
 
+
+        if self.game_mode == "DEFAULT" and self.base:
+             self.base.draw(self.screen)
+    
         for enemy in self.enemies:
             enemy.draw(self.screen)
 
@@ -409,6 +556,9 @@ class Game:
 
         pygame.display.flip()
 
+        if flip:
+            pygame.display.flip()
+
     def draw_hud(self):
         hud_x = COLS * TILE
         pygame.draw.rect(self.screen, HUD_BG_COLOR, (hud_x, 0, HUD_WIDTH, HEIGHT))
@@ -421,11 +571,43 @@ class Game:
         self.screen.blit(on_map_surf, (hud_x + 20, 60))
 
         if self.enemies_left < 4:
-            left_surf = self.font.render(f"Ворогів залишилось: {self.enemies_left}", True, HUD_TEXT_COLOR)
-            self.screen.blit(left_surf, (hud_x + 20, 140))
+            left_surf = self.font.render(f"Залишилось ворогів: {self.enemies_left}", True, HUD_TEXT_COLOR)
+            self.screen.blit(left_surf, (hud_x + 20, 180))
 
-        hp_surf = self.font.render(f"HP: {self.player.hp}", True, HUD_TEXT_COLOR)
+        hp_surf = self.font.render(f"Життів: {self.player.lives}", True, HUD_TEXT_COLOR)
         self.screen.blit(hp_surf, (hud_x + 20, 100))
+
+        hp_val_surf = self.font.render(f"HP: {self.player.hp}", True, HUD_TEXT_COLOR)
+        self.screen.blit(hp_val_surf, (hud_x + 20, 140))
+
+        if self.game_mode == "DEFAULT":
+            lvl_text = f"Рівень класики: {self.default_level_num}"
+            color = (0, 255, 0) # Зелений для класики
+        elif self.game_mode == "CAMPAIGN":
+            lvl_text = f"Рівень кампанії: {self.campaign_level_num}"
+            color = (255, 215, 0) # Золотий для кампанії
+        else:
+            lvl_text = "ARCADE"
+            color = (0, 255, 255)
+
+        lvl_surf = self.font.render(lvl_text, True, color)
+        self.screen.blit(lvl_surf, (hud_x + 10, HEIGHT - 40))
+
+    def draw_pause(self):
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        
+        overlay.fill((0, 0, 0, 50)) 
+        
+        self.screen.blit(overlay, (0, 0))
+        pause_text = self.title_font.render("ПАУЗА", True, (255, 255, 255))
+        text_rect = pause_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        self.screen.blit(pause_text, text_rect)
+        
+        sub_text = self.font.render("Натисніть БУДЬ-ЯКУ клавішу для продовження", True, (200, 200, 200))
+        sub_rect = sub_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 40))
+        self.screen.blit(sub_text, sub_rect)
+
+        pygame.display.flip()
 
     def draw_damage_flash(self):
         if self.damage_flash_timer > 0:
@@ -435,11 +617,26 @@ class Game:
             self.screen.blit(flash, (0, 0))
 
     def draw_game_over(self):
+        save_manager.add_stats(kills=self.enemy_counter, deaths=1)
         self.screen.fill((0, 0, 0))
-        game_over = self.finish_font.render("GAME OVER", True, (255, 0, 0))
-        self.screen.blit(game_over, (WIDTH // 2 - 80, HEIGHT // 2 - 20))
+        
+        reason = None
+
+        if self.game_mode == "DEFAULT" and self.base and not self.base.alive:
+            reason = "База знищена"
+
+        elif self.player.lives <= 0:
+            reason = "Ви програли"
+
+        go_surf = self.finish_font.render("GAME OVER", True, (255, 0, 0))
+        r_surf = self.font.render(reason, True, (200, 200, 200))
+
+        self.screen.blit(go_surf, (WIDTH // 2 - go_surf.get_width()//2, HEIGHT // 2 - 40))
+        self.screen.blit(r_surf, (WIDTH // 2 - r_surf.get_width()//2, HEIGHT // 2 + 10))
+
         pygame.display.flip()
-        pygame.time.wait(2000)
+        pygame.time.wait(3000)
+
         self.state = "MENU"
     
     def draw_win_message(self, text):
