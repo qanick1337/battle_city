@@ -25,7 +25,10 @@ bullet_hor = None
 explossion = None
 
 bonus_images = None
-base_images = None
+base = None
+base_destroyed = None
+
+
 
 
 def load_image(filename, size):
@@ -62,7 +65,8 @@ def load_assets():
         "GRENADE": load_image("grenade.png", TILE),
         "SHIELD": load_image("shield.png", TILE),
         "HEART": load_image("heart.png", TILE),
-        "FREEZE": load_image("freeze.png", TILE)
+        "FREEZE": load_image("freeze.png", TILE),
+        "SHOVEL": load_image("showel.png", TILE)
     }
 
     base = load_image("base.png", TILE)

@@ -1,14 +1,14 @@
 {
     "stats": {
-        "total_games": 189,
-        "total_kills": 338,
-        "deaths": 47
+        "total_games": 259,
+        "total_kills": 653,
+        "deaths": 78
     },
     "campaign_progress": {
-        "EASY": 6,
-        "NORMAL": 8,
+        "EASY": 7,
+        "NORMAL": 10,
         "HARD": 3,
-        "HARDCORE": 2
+        "HARDCORE": 6
     },
     "classic_progress": {
         "EASY": 1,

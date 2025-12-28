@@ -196,12 +196,13 @@ class Enemy:
                 if player_y < self.y:
                     needed_dir = "UP"
                 else: 
-                    needed_dir =  "DOWN"
+                    needed_dir =  "DOWN"    
                 
                 # Якщо ми не дивимось на нього - повертаємось
                 if self.direction != needed_dir:
                     self.direction = needed_dir
-                    self.move_timer += 15 
+                    self.move_timer = 30
+                    self.shoot_timer = 50
                 
                 # Стріляємо миттєво, якщо вистріл не був зроблений 1/3 секунди тому
                 if self.shoot_timer <= 20: 
@@ -219,7 +220,8 @@ class Enemy:
                 
                 if self.direction != needed_dir:
                     self.direction = needed_dir
-                    self.move_timer += 15
+                    self.move_timer = 30
+                    self.shoot_timer = 50
                 
                 if self.shoot_timer <= 20: # Якщо не щойно стріляли
                     self.shoot(bullets)

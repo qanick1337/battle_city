@@ -65,9 +65,6 @@ class Bullet:
     def draw(self, screen):
         if not self.active:
             return
-        cx = int(self.x * TILE + TILE / 2)
-        cy = int(self.y * TILE + TILE / 2)
-        pygame.draw.circle(screen, BULLET_COLOR, (cx, cy), TILE // 6)
 
         if self.direction == "UP":
             img = assets.bullet

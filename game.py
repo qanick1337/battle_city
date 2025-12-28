@@ -81,6 +81,7 @@ class Game:
         self.explosions = []
         self.bonuses = []
         self.player_respawn_timer = 0
+        self.shovel_timer = 0
 
     def get_progress_key(self):
         if self.game_mode == "DEFAULT":
@@ -303,6 +304,8 @@ class Game:
         self.damage_flash_timer = 0
         self.DAMAGE_FLASH_DURATION = FPS / 4
 
+        self.showel_timer = 0
+
     def handle_play_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: self.running = False
@@ -317,6 +320,25 @@ class Game:
             cell_x, cell_y = self.player.get_grid_pos()
             self.player_bullet = Bullet(cell_x, cell_y, self.player.direction, is_enemy=False)
             self.bullets.append(self.player_bullet)
+
+    def set_base_protection(self, tile_type):
+        if not self.base:
+            return
+
+        bx, by = self.base.x, self.base.y
+        
+
+        positions = [
+            (bx - 1, by),   
+            (bx - 1, by - 1),
+            (bx,     by - 1), 
+            (bx + 1, by - 1), 
+            (bx + 1, by) 
+        ]
+
+        for x, y in positions:
+            if 0 <= x < COLS and 0 <= y < ROWS:
+                self.level.grid[y][x] = tile_type
 
     # Оновлення стану гри
     def update_play(self):
@@ -352,7 +374,11 @@ class Game:
                 self.apply_bonus(bonus.type, self.player)
                 self.bonuses.remove(bonus)
 
-            
+        if self.shovel_timer > 0:
+            self.shovel_timer -= 1
+
+            if self.shovel_timer == 0:
+                self.set_base_protection(1) # Повертаємо 1 = ЦЕГЛА
 
         # game over
         if self.player.hp <= 0:
@@ -439,16 +465,33 @@ class Game:
                         self.enemy_counter += 1
                         self.explosions.append(Explosion(enemy_cell_x, enemy_cell_y))
 
-                        if enemy.type == "FAST":
-                            if random.random() < 0.5:
-                                self.bonuses.append(Bonus(bullet_x, bullet_y, "FREEZE"))
 
-                        if enemy.type == "SNIPER":
-                            if random.random() < 0.5:
-                                self.bonuses.append(Bonus(bullet_x, bullet_y, "GRENADE"))
-                        if enemy.type == "ARMOR":
-                            if random.random() < 0.5:
-                                self.bonuses.append(Bonus(bullet_x, bullet_y, "HEART"))
+                        chance = random.random()
+                        bonus_to_spawn = None
+                        
+                        if enemy.type == "BASIC":
+                            if self.game_mode == "DEFAULT":
+                                if chance < 0.15:     bonus_to_spawn = "SHOVEL"  # 15%
+                                elif chance < 0.20:   bonus_to_spawn = "SHIELD"  # 5% (від 0.15 до 0.20)
+                            else:
+                                if chance < 0.05:     bonus_to_spawn = "GRENADE" # 5%
+                        
+                        elif enemy.type == "FAST":
+                            if chance < 0.15:         bonus_to_spawn = "FREEZE"  # 15%
+                            elif chance < 0.20:       bonus_to_spawn = "GRENADE" # 5%
+
+                        elif enemy.type == "SNIPER":
+                            if chance < 0.10:         bonus_to_spawn = "GRENADE" # 10%
+                            elif chance < 0.15:       bonus_to_spawn = "SHOVEL"  # 5% 
+                            elif chance < 0.18:       bonus_to_spawn = "HEART"   # 3% 
+
+                        elif enemy.type == "ARMOR":
+                            if chance < 0.10:         bonus_to_spawn = "HEART"   # 10% 
+                            elif chance < 0.25:       bonus_to_spawn = "SHIELD"  # 15% 
+                            elif chance < 0.35:       bonus_to_spawn = "SHOVEL"  # 10%
+
+                        if bonus_to_spawn:
+                            self.bonuses.append(Bonus(bullet_x, bullet_y, bonus_to_spawn))
                     break
 
             if enemy.alive:
@@ -521,6 +564,11 @@ class Game:
             for enemy in self.enemies:
                 enemy.move_timer += FPS*2
                 enemy.shoot_timer += FPS*2
+        elif bonus_type == "SHOVEL":
+            self.shovel_timer = FPS * 10  # 10 секунд
+            self.set_base_protection(2)   # 2 = СТАЛЬ
+
+    
 
     # Методи малювання
     def draw_play(self, flip=True):
