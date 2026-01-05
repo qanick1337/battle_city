@@ -183,7 +183,7 @@ class Game:
         diff_text_str = f"Складність: < {self.selected_difficulty} >"
         diff_color = (255, 0, 0) if self.selected_difficulty == "HARDCORE" else (0, 255, 0)
         self.draw_text_centered(diff_text_str, 280, diff_color)
-        self.draw_text_centered("(Натисніть 1-Easy, 2-Normal, 3-Hard, 4-Hardcore)", 310, (100, 100, 100))
+        self.draw_text_centered("(Натисніть 1-Easy, 2-Normal, 3-Hard )", 310, (100, 100, 100))
 
         # 3. Кнопка Старт
         blink_speed = pygame.time.get_ticks() // 500  # Блимання раз на пів секунди
