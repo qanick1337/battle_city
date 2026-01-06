@@ -192,16 +192,24 @@ class Game:
        
         # Якщо обрано Кампанію або Класику - показуємо прогрес
         if self.game_mode == "DEFAULT":
+
+            self.draw_text_centered("Класика: Захищайте базу на стандартних мапах", HEIGHT - 90, (150, 255, 150))
+
             # Показуємо default_level_num
             lvl_info = f"Прогрес (Classic): Рівень {self.default_level_num}"
             self.draw_text_centered(lvl_info, HEIGHT - 60, (0, 255, 0))
             
         elif self.game_mode == "CAMPAIGN":
+
+            self.draw_text_centered("Кампанія: Знищіть усіх ворогів. Бази немає!", HEIGHT - 90, (255, 235, 150))
+
             # Показуємо campaign_level_num
             lvl_info = f"Прогрес (Campaign): Рівень {self.campaign_level_num}"
             self.draw_text_centered(lvl_info, HEIGHT - 60, (255, 215, 0))
             
         else:
+            self.draw_text_centered("Аркада: Випадкова генерація. Виживайте якнайдовше", HEIGHT - 90, (150, 255, 255))
+
             self.draw_text_centered("Аркада: Безкінечна війна", HEIGHT - 60, (0, 255, 255))
 
         # Загальна статистика
@@ -269,7 +277,6 @@ class Game:
         self.initial_player_lives = settings["lives"]
         self.initial_player_hp = settings["player_hp"]
         
-
     def reset_entities(self):
         if self.game_mode == "DEFAULT":
             base_x = 8
@@ -283,8 +290,6 @@ class Game:
             spawn_x = COLS // 2 # Спавн по центру
 
         spawn_y = ROWS - 2 # Завжди знизу
-
-        
 
         self.player = Player(spawn_x, spawn_y, lives=self.initial_player_lives)
         self.player.hp = self.initial_player_hp 
@@ -320,20 +325,21 @@ class Game:
             cell_x, cell_y = self.player.get_grid_pos()
             self.player_bullet = Bullet(cell_x, cell_y, self.player.direction, is_enemy=False)
             self.bullets.append(self.player_bullet)
-
+            
+    # Метод для малювання захисту навколо бази
     def set_base_protection(self, tile_type):
         if not self.base:
             return
 
-        bx, by = self.base.x, self.base.y
+        base_x, base_y = self.base.x, self.base.y
         
 
         positions = [
-            (bx - 1, by),   
-            (bx - 1, by - 1),
-            (bx,     by - 1), 
-            (bx + 1, by - 1), 
-            (bx + 1, by) 
+            (base_x - 1, base_y),   
+            (base_x - 1, base_y - 1),
+            (base_x,     base_y - 1), 
+            (base_x + 1, base_y - 1), 
+            (base_x + 1, base_y) 
         ]
 
         for x, y in positions:
@@ -382,7 +388,6 @@ class Game:
 
         # game over
         if self.player.hp <= 0:
-
             if self.player_respawn_timer > 0:
                 self.player_respawn_timer -= 1
             else:
@@ -472,7 +477,7 @@ class Game:
                         if enemy.type == "BASIC":
                             if self.game_mode == "DEFAULT":
                                 if chance < 0.15:     bonus_to_spawn = "SHOVEL"  # 15%
-                                elif chance < 0.20:   bonus_to_spawn = "SHIELD"  # 5% (від 0.15 до 0.20)
+                                elif chance < 0.20:   bonus_to_spawn = "SHIELD"  # 5%
                             else:
                                 if chance < 0.05:     bonus_to_spawn = "GRENADE" # 5%
                         
@@ -482,13 +487,13 @@ class Game:
 
                         elif enemy.type == "SNIPER":
                             if chance < 0.10:         bonus_to_spawn = "GRENADE" # 10%
-                            elif chance < 0.15:       bonus_to_spawn = "SHOVEL"  # 5% 
+                            elif chance < 0.15 and self.game_mode == "DEFAULT":       bonus_to_spawn = "SHOVEL"  # 5% 
                             elif chance < 0.18:       bonus_to_spawn = "HEART"   # 3% 
 
                         elif enemy.type == "ARMOR":
                             if chance < 0.10:         bonus_to_spawn = "HEART"   # 10% 
                             elif chance < 0.25:       bonus_to_spawn = "SHIELD"  # 15% 
-                            elif chance < 0.35:       bonus_to_spawn = "SHOVEL"  # 10%
+                            elif chance < 0.35 and self.game_mode == "DEFAULT":       bonus_to_spawn = "SHOVEL"  # 10%
 
                         if bonus_to_spawn:
                             self.bonuses.append(Bonus(bullet_x, bullet_y, bonus_to_spawn))
@@ -621,6 +626,10 @@ class Game:
         if self.enemies_left < 4:
             left_surf = self.font.render(f"Залишилось ворогів: {self.enemies_left}", True, HUD_TEXT_COLOR)
             self.screen.blit(left_surf, (hud_x + 20, 180))
+
+        xy_text = f"XY: {int(self.player.x)}, {int(self.player.y)}"
+        xy_surf = self.font.render(xy_text, True, (200, 200, 200)) # Сірий колір
+        self.screen.blit(xy_surf, (hud_x + 20, 220))
 
         hp_surf = self.font.render(f"Життів: {self.player.lives}", True, HUD_TEXT_COLOR)
         self.screen.blit(hp_surf, (hud_x + 20, 100))

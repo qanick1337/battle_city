@@ -43,10 +43,6 @@ class Enemy:
 
     @classmethod
     def get_sprites_for_type(cls, enemy_type, hue):
-        """
-        Розумне кешування. Перевіряє, чи генерували ми вже картинки 
-        для цього типу ворогів. Якщо ні - генерує і зберігає.
-        """
         # Ключ кешу, наприклад: "FAST_180" або "BASIC_None"
         cache_key = f"{enemy_type}_{hue}"
         
@@ -80,10 +76,6 @@ class Enemy:
 
     @staticmethod
     def colorize_surface(surface, target_hue):
-        """
-        Змінює Hue (відтінок) картинки, зберігаючи яскравість і прозорість.
-        Працює повільно, тому результат ТРЕБА кешувати.
-        """
         # Створюємо копію, щоб не псувати оригінал
         new_surface = surface.copy()
         
@@ -245,9 +237,9 @@ class Enemy:
         is_tracking_active = dist_y > 3 and dist_x >3
 
         for direction, dx, dy, weight in directions:
-            nx, ny = self.x + dx, self.y + dy
+            new_x, new_y = self.x + dx, self.y + dy
             
-            if not level.can_move(nx, ny):
+            if not level.can_move(new_x, new_y):
                 continue
             
             # 2. Модифікатор: Якщо це напрямок до гравця - збільшуємо вагу

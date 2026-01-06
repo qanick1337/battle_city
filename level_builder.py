@@ -40,28 +40,28 @@ class Level:
             for x in range(2, COLS // 2, 2):
 
                 r = random.random()
+                
+                # 1. Вода (Шанс 15%: від 0.0 до 0.15)
+                if r < 0.15:
+                    self.grid[y][x] = 3
 
-                # Шанс 35% на вертикальну стіну з цегли
-                if r < 0.35:
-                    height = random.randint(2, 5)
-                    self.add_vertical_line(x, y, height, 1)
-
-                # Шанс 70% на горизонтальну стіну з цегли
-                elif r < 0.70:
-                    width = random.randint(2, 5)
-                    self.add_horizontal_line(x, y, width, 1)
-
-                # Шанс 65% на стальний блок (2x1)
-                elif r < 0.65:
+                # 2. Сталь (Шанс 10%: від 0.15 до 0.25)
+                elif r < 0.25:
                     self.grid[y][x] = 2
                     if x + 1 < COLS - 1:
                         self.grid[y][x + 1] = 2
 
-                # Шанс 20% на воду (1x1)
-                elif r < 0.20:
-                    self.grid[y][x] = 3
+                # 3. Вертикальна стіна (Шанс 25%: від 0.25 до 0.50)
+                elif r < 0.50:
+                    height = random.randint(2, 5)
+                    self.add_vertical_line(x, y, height, 1)
 
-                # Шанс 30% на траву (інколи 2x1)
+                # 4. Горизонтальна стіна (Шанс 25%: від 0.50 до 0.75)
+                elif r < 0.75:
+                    width = random.randint(2, 5)
+                    self.add_horizontal_line(x, y, width, 1)
+
+                # 5. Трава (Шанс 25%: від 0.75 до 1.0)
                 else:
                     self.grid[y][x] = 4
                     if x + 1 < COLS - 1 and random.random() < 0.5:
@@ -72,7 +72,7 @@ class Level:
             for x in range(COLS // 2):
                 self.grid[y][COLS - 1 - x] = self.grid[y][x]
 
-        # 3) Очистка зон спавну ворогів (тільки клітинка спавну)
+        # 3) Очистка зон спавну ворогів
         for sx, sy in self.enemy_spawn_points:
             if 0 <= sx < COLS and 0 <= sy < ROWS:
                 self.grid[sy][sx] = 0
@@ -88,17 +88,17 @@ class Level:
                 self.grid[y][x + i] = type_id
 
     # Валідація рівню
-    def _is_walkable(self, x, y) -> bool:
+    def _is_walkable(self, x, y):
         return self.grid[y][x] in (0, 4)
 
-    def bfs_from(self, sx, sy) -> set:
-        if not (0 <= sx < COLS and 0 <= sy < ROWS):
+    def bfs_from(self, spawn_x, spawn_y):
+        if not (0 <= spawn_x < COLS and 0 <= spawn_y < ROWS):
             return set()
-        if not self._is_walkable(sx, sy):
+        if not self._is_walkable(spawn_x, spawn_y):
             return set()
 
-        visited = set([(sx, sy)])
-        q = deque([(sx, sy)])
+        visited = set([(spawn_x, spawn_y)])
+        q = deque([(spawn_x, spawn_y)])
 
         while q:
             x, y = q.popleft()
@@ -121,12 +121,11 @@ class Level:
 
             reachable = self.bfs_from(spawn_x, spawn_y)
 
-            # не "кишеня"
             if len(reachable) < MIN_AREA:
                 return False
 
             # є можливість реально піти вниз у гру
-            if not any(y >= MIN_EXIT_Y for (_, y) in reachable):
+            if not any(y >= MIN_EXIT_Y for (x, y) in reachable):
                 return False
 
         return True
