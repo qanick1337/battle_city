@@ -53,13 +53,11 @@ def update_progress(game_mode, difficulty, level_num):
 
     data = load_data()
     
-    # Визначаємо, в яку секцію писати дані
     if game_mode == "CLASSIC":
         dict_key = "classic_progress"
     else:
         dict_key = "campaign_progress"
     
-    # Отримуємо поточний рекорд для цієї складності
     current_best = data[dict_key].get(difficulty, 1)
     
     if level_num > current_best:

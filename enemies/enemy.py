@@ -15,7 +15,6 @@ class Enemy:
         self.type = enemy_type
         self.invincible = 0
         
-        # Завантажуємо характеристики з "конфіга"
         stats = ENEMY_TYPES.get(enemy_type, ENEMY_TYPES["BASIC"])
         
         self.speed_delay = stats["speed"]
@@ -23,23 +22,17 @@ class Enemy:
         self.hue = stats.get("hue", None)
         self.score = stats["score"]
         
-        # Налаштування стрільби
         shoot_range = stats.get("shoot_freq", (60, 180)) # (min, max)
         self.shoot_min, self.shoot_max = shoot_range
 
         self.direction = "DOWN"
         
-        # Лічильники
         self.move_timer = self.speed_delay
         self.shoot_timer = random.randint(self.shoot_min, self.shoot_max)
 
         self.alive = True
 
         self.sprites = self.get_sprites_for_type(enemy_type, self.hue)
-
-    @property
-    def rect(self):
-        return pygame.Rect(self.x * TILE, self.y * TILE, TILE, TILE)
 
     @classmethod
     def get_sprites_for_type(cls, enemy_type, hue):
@@ -119,7 +112,6 @@ class Enemy:
             self.alive = False
             return True
         
-        # Мерехтіння для ARMOR танків
         self.invincible = 10
         return False
 
@@ -132,20 +124,22 @@ class Enemy:
 
         self.check_line_of_sight(player, bullets)
 
-        # Звичайна стрільба за таймером
         self.shoot_timer -= 1
+
         if self.shoot_timer <= 0:
             self.shoot(bullets)
             self.shoot_timer = random.randint(self.shoot_min, self.shoot_max)
 
-        # Рух
+        # Якщо лічильник ще не закінчився - ворог не може рухатися
         if self.move_timer > 0:
             self.move_timer -= 1
             return
         
+        # Рух ворога
         self.move_timer = self.speed_delay
 
         dx = dy = 0
+
         if self.direction == "UP":
             dy = -1
         elif self.direction == "DOWN":
@@ -164,11 +158,10 @@ class Enemy:
             if random.random() < 0.05:
                  self.change_direction_smart(level, player)
         else:
-            # якщо врізався → змінюємо напрямок
+            # якщо врізався то змінюємо напрямок
             self.change_direction_smart(level, player)   
 
     def check_line_of_sight(self, player, bullets):
-
         if self.type == "SNIPER":
             reaction_chance = 0.7
         else:
@@ -179,45 +172,27 @@ class Enemy:
 
         player_x, player_y = player.get_grid_pos()
         
-        # Перевірка по вертикалі (X співпадає)
-        if self.x == player_x:
-            dist = abs(self.y - player_y)
-            if dist < 6: 
+        needed_dir = None
 
-                # Рахуємо, в якому напрямку нам рухатися, щоб наздогнати гравця
-                if player_y < self.y:
-                    needed_dir = "UP"
-                else: 
-                    needed_dir =  "DOWN"    
-                
-                # Якщо ми не дивимось на нього - повертаємось
-                if self.direction != needed_dir:
-                    self.direction = needed_dir
-                    self.move_timer = 30
-                    self.shoot_timer = 50
-                
-                # Стріляємо миттєво, якщо вистріл не був зроблений 1/3 секунди тому
-                if self.shoot_timer <= 20: 
-                    self.shoot(bullets)
-                    self.shoot_timer = random.randint(self.shoot_min, self.shoot_max)
+        needed_dir_y = self.get_direction(self.x, player_x, self.y, player_y, "UP", "DOWN")
+        needed_dir_x = self.get_direction(self.y, player_y, self.x, player_x, "LEFT", "RIGHT") 
 
-        # Перевірка по горизонталі (Y співпадає)
-        elif self.y == player_y:
-            dist = abs(self.x - player_x)
+        needed_dir = needed_dir_x or needed_dir_y
+
+        if needed_dir and self.direction != needed_dir:
+            self.direction = needed_dir
+            self.move_timer = 30
+            self.shoot_timer = 30
+
+    def get_direction(self, coord_equal1, coord_equal2, coord_different1, coord_differen2, direction1, direction2):
+        if coord_equal1 == coord_equal2:
+            dist = abs(coord_different1-coord_differen2)
             if dist < 6:
-                if player_x < self.x:
-                    needed_dir = "LEFT"
-                else: 
-                    needed_dir =  "RIGHT"
+                if coord_differen2 < coord_different1:
+                    return direction1
+                else:
+                    return direction2
                 
-                if self.direction != needed_dir:
-                    self.direction = needed_dir
-                    self.move_timer = 30
-                    self.shoot_timer = 50
-                
-                if self.shoot_timer <= 20: # Якщо не щойно стріляли
-                    self.shoot(bullets)
-                    self.shoot_timer = random.randint(self.shoot_min, self.shoot_max)
 
     def change_direction_smart(self, level, player):
         options = []
@@ -229,20 +204,19 @@ class Enemy:
             ("RIGHT", 1, 0, 15)
         ]
         
-        player_x, player_y = player.get_grid_pos()
+        (player_x, player_y) = player.get_grid_pos()
 
         dist_x = abs(player_x - self.x)
         dist_y = abs(player_y - self.y)
 
         is_tracking_active = dist_y > 3 and dist_x >3
 
-        for direction, dx, dy, weight in directions:
+        for (direction, dx, dy, weight) in directions:
             new_x, new_y = self.x + dx, self.y + dy
             
             if not level.can_move(new_x, new_y):
                 continue
             
-            # 2. Модифікатор: Якщо це напрямок до гравця - збільшуємо вагу
             if is_tracking_active:
                 if direction == "DOWN" and player_y > self.y: 
                     weight += 30
@@ -253,13 +227,11 @@ class Enemy:
                 if direction == "RIGHT" and player_x > self.x: 
                     weight += 30
             
-            # Додаємо цей напрямок у список стільки разів, яка його вага
             options.append(direction)
 
             for num in range(weight):
                 options.append(direction)
 
-        # Момент вибору напрямку
         if options:
             self.direction = random.choice(options)
         else:

@@ -20,6 +20,12 @@ PLAYER_SPEED_TILES = 15
 
 ENEMY_MOVE_DELAY = PLAYER_SPEED_TILES*1.5  
 
+BRICK = "#"
+STEEL = "@"
+WATER = "~"
+GRASS = "%"
+EMPTY = "."
+
 ENEMY_TYPES = {
     "BASIC": {
         "speed": ENEMY_MOVE_DELAY, 

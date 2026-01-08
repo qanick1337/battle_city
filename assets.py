@@ -20,16 +20,13 @@ steel = None
 water = None
 grass = None
 
-bullet = None
-bullet_hor = None
+bullet_vertical = None
+bullet_horizontal = None
 explossion = None
 
 bonus_images = None
 base = None
 base_destroyed = None
-
-
-
 
 def load_image(filename, size):
     path = os.path.join(ASSETS_DIR, filename)
@@ -40,7 +37,7 @@ def load_image(filename, size):
 
 
 def load_assets():
-    global player_up, player_down, player_left, player_right, enemy_up, enemy_down, enemy_left, enemy_right, brick, steel, water, bullet, bullet_hor, grass, explossion, bonus_images, base, base_destroyed
+    global player_up, player_down, player_left, player_right, enemy_up, enemy_down, enemy_left, enemy_right, brick, steel, water, bullet_vertical, bullet_horizontal, grass, explossion, bonus_images, base, base_destroyed
 
     player_up = load_image("tank_top.png", TILE)
     player_down = load_image("tank_bottom.png", TILE)
@@ -57,8 +54,8 @@ def load_assets():
     water = load_image("water.jpg", TILE)
     grass = load_image("leaves.webp", TILE)
 
-    bullet = load_image("bullet.png",TILE)
-    bullet_hor = load_image("bullet _hor.png", TILE)
+    bullet_vertical = load_image("bullet.png",TILE)
+    bullet_horizontal = load_image("bullet _hor.png", TILE)
     explossion = load_image("explossion_tank.png", TILE)
 
     bonus_images = {

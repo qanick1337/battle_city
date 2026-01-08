@@ -19,11 +19,10 @@ class Player:
         self.lives = lives
 
         self.size = TILE
-        self.move_cooldown = 0  # затримка між рухами
+        self.move_cooldown = 0
 
         self.spawn = (2, ROWS - 3)
 
-        # Керування: група клавіш -> (direction, dx, dy)
         self.controls = {
             (pygame.K_w, pygame.K_UP):    lambda: ("UP",    0, -1),
             (pygame.K_s, pygame.K_DOWN):  lambda: ("DOWN",  0,  1),
@@ -48,20 +47,18 @@ class Player:
         return False
 
     def respawn(self):
-
-        self.x, self.y = self.start_pos
+        (self.x, self.y) = self.start_pos
         
         self.direction = "UP"
         self.hp = 1 
 
-        self.invincible = 180 # 3 секунди невразливості 
+        self.invincible = 180
 
     def handle_input(self, keys, level):
         if self.move_cooldown > 0:
             self.move_cooldown -= 1
             return
 
-        # шукаємо першу натиснуту групу клавіш
         for key_group, action in self.controls.items():
             if any(keys[k] for k in key_group):
                 direction, dx, dy = action()
@@ -98,7 +95,6 @@ class Player:
         if self.invincible > 0:
             сenter = (self.x * TILE + TILE // 2, self.y * TILE + TILE // 2)
             radius = TILE // 2 + 2
-             # Малюємо тонке синє коло
             pygame.draw.circle(screen, (100, 100, 255), сenter, radius, width=2)
 
         screen.blit(img, (self.x * TILE, self.y * TILE))
